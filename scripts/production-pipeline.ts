@@ -4,6 +4,7 @@
  * Industry Standards: LangChain + HF Pro Reranking + Redis + OpenTelemetry
  */
 
+import 'dotenv/config';
 import { ChromaClient } from 'chromadb';
 import { DefaultEmbeddingFunction } from '@chroma-core/default-embed';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
