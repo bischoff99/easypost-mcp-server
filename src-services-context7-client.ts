@@ -1,11 +1,14 @@
 import { fetch } from 'undici';
+import { serverConfig } from './src-config.js';
 
 export class Context7Client {
-  private apiKey: string;
-  private baseUrl = 'https://api.context7.ai/v1';
+  private apiKey?: string;
+  private baseUrl: string;
 
   constructor() {
-    this.apiKey = process.env.CONTEXT7_API_KEY || '';
+    this.apiKey = serverConfig.context7.apiKey;
+    this.baseUrl = serverConfig.context7.baseUrl;
+
     if (!this.apiKey) {
       console.warn('CONTEXT7_API_KEY not found, using fallback mode');
     }
@@ -54,7 +57,7 @@ export class Context7Client {
           product_description: description,
           destination_country: destinationCountry 
         }),
-        signal: AbortSignal.timeout(30000)
+        signal: AbortSignal.timeout(serverConfig.context7.timeout)
       });
 
       if (!response.ok) {

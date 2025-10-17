@@ -44,14 +44,27 @@ export async function generateCustoms(products: any[], destinationCountry: strin
 
   const customsItems = [];
   for (const product of products) {
-    const htsData = await context7.getHTSCode(product.description, destinationCountry);
+    // Use existing HTS code if present, otherwise look it up via Context7
+    let htsCode = product.htsCode;
+    
+    if (!htsCode) {
+      try {
+        const htsData = await context7.getHTSCode(product.description, destinationCountry);
+        htsCode = htsData.code;
+      } catch (error: any) {
+        console.warn(`HTS lookup failed for "${product.description}": ${error.message}, using fallback`);
+        // Fallback to a generic code if lookup fails
+        htsCode = '9999.99.9999';
+      }
+    }
+    
     customsItems.push({
       description: product.description,
-      htsCode: htsData.code,
+      htsCode: htsCode,
       quantity: product.quantity || 1,
       value: product.value || calculateEstimatedValue(product),
       weightOz: convertToOunces(product.weightLbs || 1.5),
-      countryOfOrigin: 'US',
+      countryOfOrigin: product.countryOfOrigin || 'US',
       declaration: restrictionFlag ? 'PERSONAL USE' : 'GIFT'
     });
   }

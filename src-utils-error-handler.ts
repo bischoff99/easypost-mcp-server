@@ -1,7 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import pino from 'pino';
+import { serverConfig } from './src-config.js';
 
 const logger = pino({
+  level: serverConfig.logging.level,
   transport: {
     target: 'pino-pretty',
     options: {
@@ -33,8 +35,8 @@ export class CircuitBreaker {
   private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
 
   constructor(
-    private readonly threshold: number = 5,
-    private readonly timeout: number = 60000
+    private readonly threshold: number = serverConfig.circuitBreaker.threshold,
+    private readonly timeout: number = serverConfig.circuitBreaker.timeout
   ) {}
 
   async execute<T>(fn: () => Promise<T>, fallback?: () => T): Promise<T> {
@@ -56,7 +58,7 @@ export class CircuitBreaker {
       return result;
     } catch (error) {
       this.onFailure();
-      if (fallback && this.state === 'OPEN') {
+      if (fallback && this.state !== 'CLOSED') {
         logger.warn('Using fallback due to circuit breaker');
         return fallback();
       }
@@ -89,8 +91,8 @@ export class CircuitBreaker {
 
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
-  maxRetries = 3,
-  baseDelay = 2000
+  maxRetries = serverConfig.retry.maxRetries,
+  baseDelay = serverConfig.retry.baseDelay
 ): Promise<T> {
   let lastError: Error;
 

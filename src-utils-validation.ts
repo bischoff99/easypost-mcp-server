@@ -53,8 +53,47 @@ export function parseShippingInput(inputData: string): any {
 
 function parseCSVInput(csvData: string): any {
   const lines = csvData.trim().split('\n');
-  const headers = lines[0].split(/[,\t]/);
-  const values = lines[1].split(/[,\t]/);
+  
+  // Check if first line has headers or is direct data
+  const firstLine = lines[0]?.split(/[\t]/) || [];
+  
+  // If only one line, assume it's tab-separated data without headers
+  // Format: ShipFrom | Carrier | Company | Name | Phone | Email | Street1 | Street2 | City | State | Zip | Country | RestrictionFlag | Dimensions | Weight | ProductDetails
+  if (lines.length === 1 && firstLine.length > 10) {
+    const dims = (firstLine[13] || '12 x 12 x 4').split(/[\sx]+/).map(d => parseFloat(d.trim()));
+    const weightStr = (firstLine[14] || '1 lbs').replace(/lbs?/i, '').trim();
+    
+    return {
+      recipient: {
+        company: firstLine[2]?.trim() || '',
+        name: firstLine[3]?.trim() || '',
+        phone: firstLine[4]?.trim() || '',
+        email: firstLine[5]?.trim() || '',
+        street1: firstLine[6]?.trim() || '',
+        street2: firstLine[7]?.trim() || '',
+        city: firstLine[8]?.trim() || '',
+        state: firstLine[9]?.trim() || '',
+        zip: firstLine[10]?.trim() || '',
+        country: firstLine[11]?.trim() || 'US'
+      },
+      sender: null,
+      weightLbs: parseFloat(weightStr) || 1,
+      dimensions: {
+        length: dims[0] || 12,
+        width: dims[1] || 12,
+        height: dims[2] || 4
+      },
+      productDetails: firstLine[15] ? parseProductDetails(firstLine[15]) : [],
+      restrictionFlag: firstLine[12]?.toLowerCase() === 'true',
+      serviceLevel: (firstLine[1]?.toLowerCase() === 'fedex') ? 'express' : 'ground',
+      shipFromState: firstLine[0]?.trim() || 'California',
+      preferredCarrier: firstLine[1]?.trim().toUpperCase() || null  // Column 1: FEDEX, UPS, USPS, etc.
+    };
+  }
+  
+  // Otherwise use header-based parsing
+  const headers = lines[0]?.split(/[,\t]/) || [];
+  const values = lines[1]?.split(/[,\t]/) || [];
   
   const data: Record<string, string> = {};
   headers.forEach((header, idx) => {
@@ -89,6 +128,28 @@ function parseCSVInput(csvData: string): any {
   };
 }
 
+function parseProductDetails(productStr: string): any[] {
+  // Parse product strings like "(2) Gel-Infused Cooling Memory Foam Pillow HTS Code: 9404.90.1000 ($38 each)"
+  const qtyMatch = productStr.match(/\((\d+)\)/);
+  const htsMatch = productStr.match(/HTS Code:\s*(\d+\.[\d.]+)/);
+  const priceMatch = productStr.match(/\$(\d+(?:\.\d{2})?)/);
+  const descMatch = productStr.match(/\)\s*(.+?)\s*HTS Code/);
+  
+  const quantity = (qtyMatch && qtyMatch[1]) ? parseInt(qtyMatch[1]) : 1;
+  const htsCode = (htsMatch && htsMatch[1]) ? htsMatch[1] : '';
+  const price = (priceMatch && priceMatch[1]) ? parseFloat(priceMatch[1]) : 50;
+  const description = (descMatch && descMatch[1]) ? descMatch[1].trim() : productStr.substring(0, 50);
+  
+  return [{
+    description: description,
+    quantity: quantity,
+    value: price,
+    weightLbs: 1.5,
+    htsCode: htsCode,
+    countryOfOrigin: 'US'
+  }];
+}
+
 function parseTextInput(textData: string): any {
   const lines = textData.split('\n');
   const parsed: any = {
@@ -104,10 +165,10 @@ function parseTextInput(textData: string): any {
     const lower = line.toLowerCase();
     if (lower.includes('to:')) {
       const addrMatch = line.match(/To:\s*(.+)/i);
-      if (addrMatch) {
+      if (addrMatch && addrMatch[1]) {
         const parts = addrMatch[1].split(',').map(p => p.trim());
         parsed.recipient = {
-          name: parts[0],
+          name: parts[0] || '',
           street1: parts[1] || '',
           city: parts[2] || '',
           state: parts[3] || '',
@@ -118,10 +179,10 @@ function parseTextInput(textData: string): any {
       }
     } else if (lower.includes('from:')) {
       const addrMatch = line.match(/From:\s*(.+)/i);
-      if (addrMatch) {
+      if (addrMatch && addrMatch[1]) {
         const parts = addrMatch[1].split(',').map(p => p.trim());
         parsed.sender = {
-          company: parts[0],
+          company: parts[0] || '',
           street1: parts[1] || '',
           city: parts[2] || '',
           state: parts[3] || '',
@@ -131,10 +192,10 @@ function parseTextInput(textData: string): any {
       }
     } else if (lower.includes('weight:') || lower.includes('baseweight:')) {
       const weightMatch = line.match(/(\d+\.?\d*)\s*lbs?/i);
-      if (weightMatch) parsed.weightLbs = parseFloat(weightMatch[1]);
+      if (weightMatch && weightMatch[1]) parsed.weightLbs = parseFloat(weightMatch[1]);
     } else if (lower.includes('dimensions:')) {
       const dimMatch = line.match(/(\d+)[-x](\d+)[-x](\d+)/i);
-      if (dimMatch) {
+      if (dimMatch && dimMatch[1] && dimMatch[2] && dimMatch[3]) {
         parsed.dimensions = {
           length: parseInt(dimMatch[1]),
           width: parseInt(dimMatch[2]),
@@ -171,44 +232,169 @@ export const weightConverter = {
   }
 };
 
-export function selectShipFromAddress(shippingInput: any): any {
-  const recipientState = shippingInput.recipient?.state?.toUpperCase();
-  
-  // State-based selection
-  if (recipientState === 'CA') {
+function generateDynamicCompanyInfo(productDetails: any[]): any {
+  if (!productDetails || productDetails.length === 0) {
     return {
-      company: 'My Framing Store Inc - LA',
+      company: 'Premium Home & Wellness Products',
+      name: 'Shipping Department',
+      email: 'shipping@premiumhomewellness.com'
+    };
+  }
+  
+  const primaryProduct = productDetails[0];
+  const htsCode = primaryProduct.htsCode || '';
+  const description = primaryProduct.description?.toLowerCase() || '';
+  
+  // Route based on HTS code prefix (first 4 digits)
+  const htsPrefix = htsCode.substring(0, 4);
+  
+  // HTS Code-based routing with description refinement
+  switch (htsPrefix) {
+    case '9404': // Bedding, pillows, cushions, mattresses
+      if (description.includes('memory foam')) {
+        return {
+          company: 'Memory Foam Comfort Solutions',
+          name: 'Jennifer Martinez',
+          email: 'orders@memoryfoamcomfort.com'
+        };
+      }
+      return {
+        company: 'SleepWell Bedding Co.',
+        name: 'Robert Chen',
+        email: 'shipping@sleepwellbedding.com'
+      };
+    
+    case '3307': // Perfumes, cosmetics, bath products
+      if (description.includes('dead sea') || description.includes('mineral')) {
+        return {
+          company: 'Dead Sea Wellness Co.',
+          name: 'Sarah Johnson',
+          email: 'orders@deadseawellness.com'
+        };
+      }
+      if (description.includes('bath salt')) {
+        return {
+          company: 'Spa & Bath Essentials',
+          name: 'Michelle Lee',
+          email: 'shipping@spabathessentials.com'
+        };
+      }
+      return {
+        company: 'Wellness & Beauty Essentials',
+        name: 'Amanda Rodriguez',
+        email: 'shipping@wellnessbeauty.com'
+      };
+    
+    case '6204': // Women's clothing, jeans
+    case '6203': // Men's clothing
+      if (description.includes('denim') || description.includes('jean')) {
+        return {
+          company: 'Premium Denim & Apparel',
+          name: 'David Kim',
+          email: 'orders@premiumdenim.com'
+        };
+      }
+      return {
+        company: 'Fashion Apparel Direct',
+        name: 'Lisa Wang',
+        email: 'shipping@fashionapparel.com'
+      };
+    
+    case '6109': // T-shirts, cotton garments
+      return {
+        company: 'Cotton Apparel Co.',
+        name: 'Michael Brown',
+        email: 'shipping@cottonapparel.com'
+      };
+    
+    case '6201': // Coats, jackets, outerwear
+      return {
+        company: 'Outerwear & Jackets Inc.',
+        name: 'Jessica Taylor',
+        email: 'shipping@outerwearjackets.com'
+      };
+    
+    case '8517': // Electronics, phones, accessories
+      return {
+        company: 'Tech Gadgets Direct',
+        name: 'Kevin Patel',
+        email: 'orders@techgadgets.com'
+      };
+    
+    case '6403': // Footwear, shoes
+      return {
+        company: 'Footwear Specialists',
+        name: 'Sophia Garcia',
+        email: 'shipping@footwearspec.com'
+      };
+    
+    case '4202': // Handbags, luggage, accessories
+      return {
+        company: 'Bags & Accessories Co.',
+        name: 'Emily Davis',
+        email: 'orders@bagsaccessories.com'
+      };
+    
+    default:
+      // Generic fallback
+      return {
+        company: 'Premium Home & Wellness Products',
+        name: 'Shipping Department',
+        email: 'shipping@premiumhomewellness.com'
+      };
+  }
+}
+
+export function selectShipFromAddress(shippingInput: any): any {
+  // Generate dynamic company info based on products
+  const companyInfo = generateDynamicCompanyInfo(shippingInput.productDetails);
+  
+  // Use the shipFromState field if available (from CSV column 0), otherwise fall back to recipient state
+  let shipFromState = shippingInput.shipFromState?.toUpperCase();
+  
+  // If no explicit shipFromState and domestic, use recipient state
+  if (!shipFromState && shippingInput.recipient?.country === 'US') {
+    shipFromState = shippingInput.recipient?.state?.toUpperCase();
+  }
+  
+  // Base address structure with dynamic company info
+  const baseAddress = {
+    company: companyInfo.company,
+    name: companyInfo.name,
+    country: 'US',
+    email: companyInfo.email
+  };
+  
+  // State-based warehouse selection with dynamic company names
+  if (shipFromState === 'CALIFORNIA' || shipFromState === 'CA') {
+    return {
+      ...baseAddress,
       street1: '1234 S Broadway',
       city: 'Los Angeles',
       state: 'CA',
       zip: '90015',
-      country: 'US',
-      phone: '(213) 555-0100',
-      email: 'shipping-la@myframingstore.com'
+      phone: '(213) 555-0100'
     };
-  } else if (recipientState === 'NV') {
+  } else if (shipFromState === 'NEVADA' || shipFromState === 'NV') {
     return {
-      company: 'My Framing Store Inc - Vegas',
+      ...baseAddress,
+      company: `${companyInfo.company} - NV`,
       street1: '3000 Paradise Rd',
       city: 'Las Vegas',
       state: 'NV',
       zip: '89109',
-      country: 'US',
-      phone: '(702) 555-0100',
-      email: 'shipping-lv@myframingstore.com'
+      phone: '(702) 555-0200'
     };
   }
   
-  // Default to Los Angeles
+  // Default to Los Angeles warehouse for all other cases (including international)
   return {
-    company: 'My Framing Store Inc',
+    ...baseAddress,
     street1: '1234 S Broadway',
     city: 'Los Angeles',
     state: 'CA',
     zip: '90015',
-    country: 'US',
-    phone: '(213) 555-0100',
-    email: 'shipping@myframingstore.com'
+    phone: '(213) 555-0100'
   };
 }
 

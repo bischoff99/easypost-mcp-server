@@ -1,14 +1,12 @@
 import EasyPostClient from '@easypost/api';
-import { config } from 'dotenv';
-
-config();
+import { serverConfig } from './src-config.js';
 
 export class EasyPostService {
-  private client: EasyPostClient;
+  private client: any;
   private apiKey: string;
 
   constructor() {
-    this.apiKey = process.env.EASYPOST_API_KEY || '';
+    this.apiKey = serverConfig.easypost.apiKey;
     if (!this.apiKey) {
       throw new Error('EASYPOST_API_KEY environment variable is required');
     }
@@ -17,17 +15,24 @@ export class EasyPostService {
 
   async createShipment(shipmentData: any): Promise<any> {
     try {
-      const shipment = await this.client.Shipment.create({
+      const createData: any = {
         to_address: shipmentData.to_address,
         from_address: shipmentData.from_address,
         parcel: shipmentData.parcel,
-        customs_info: shipmentData.customs_info,
         options: {
           label_format: 'PDF',
           invoice_number: `INV-${Date.now()}`,
+          incoterm: 'DDP',  // Request Delivered Duty Paid for international shipments
           ...(shipmentData.insurance && { insurance: shipmentData.insurance })
         }
-      });
+      };
+
+      // Only add customs_info if it exists and is not null/undefined
+      if (shipmentData.customs_info) {
+        createData.customs_info = shipmentData.customs_info;
+      }
+
+      const shipment = await this.client.Shipment.create(createData);
 
       return shipment;
     } catch (error: any) {
@@ -35,9 +40,36 @@ export class EasyPostService {
     }
   }
 
-  async buyLabel(shipmentId: string, rateId?: string): Promise<any> {
+  async buyLabel(shipmentId: string, rateId?: string, shipmentObject?: any): Promise<any> {
     try {
-      const shipment = await this.client.Shipment.retrieve(shipmentId);
+      // Use provided shipment object if available, otherwise retrieve it
+      let shipment = shipmentObject;
+      if (!shipment) {
+        console.error('No shipment object provided, retrieving...');
+        shipment = await this.client.Shipment.retrieve(shipmentId);
+      } else {
+        console.error('Shipment object provided:', {
+          id: shipment.id,
+          hasRates: !!shipment.rates,
+          rateCount: shipment.rates?.length || 0,
+          isObject: typeof shipment === 'object'
+        });
+      }
+      
+      // Check if rates are available
+      if (!shipment.rates || shipment.rates.length === 0) {
+        const shipmentInfo = {
+          id: shipment.id,
+          hasRatesProperty: 'rates' in shipment,
+          ratesType: typeof shipment.rates,
+          ratesLength: shipment.rates?.length || 0,
+          shipmentKeys: Object.keys(shipment).slice(0, 10),
+          hasMessages: !!shipment.messages,
+          messages: shipment.messages
+        };
+        console.error('ERROR: No rates in shipment:', JSON.stringify(shipmentInfo, null, 2));
+        throw new Error(`No rates available for this shipment (ID: ${shipment.id}). Shipment was created but returned ${shipment.rates?.length || 0} rates. This may indicate invalid addresses or test API limitations.`);
+      }
       
       // Select rate (lowest by default or specified rateId)
       let selectedRate = shipment.rates[0];
@@ -45,6 +77,7 @@ export class EasyPostService {
         selectedRate = shipment.rates.find((r: any) => r.id === rateId) || selectedRate;
       }
 
+      // Buy the shipment - pass the rate object directly
       const boughtShipment = await this.client.Shipment.buy(shipmentId, selectedRate);
       
       return {

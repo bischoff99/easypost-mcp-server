@@ -13,6 +13,7 @@ import { addressValidationTool, validateAddress } from './src-tools-address-vali
 import { customsCalculatorTool, generateCustoms } from './src-tools-customs-calculator.js';
 import { weightConverterTool, convertAndBuffer } from './src-tools-weight-converter.js';
 import { carrierSelectorTool, selectCarrierService } from './src-tools-carrier-selector.js';
+import { rateFetcherTool, getShippingRates } from './src-tools-rate-fetcher.js';
 
 const server = new Server(
   {
@@ -34,7 +35,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       addressValidationTool,
       customsCalculatorTool,
       weightConverterTool,
-      carrierSelectorTool
+      carrierSelectorTool,
+      rateFetcherTool
     ]
   };
 });
@@ -43,18 +45,25 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
+  if (!args) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      'Missing required arguments'
+    );
+  }
+
   try {
     switch (name) {
       case 'create_shipping_label':
         return await createShippingLabel(args);
       case 'validate_address':
-        return await validateAddress(args.address);
+        return await validateAddress((args as any).address);
       case 'calculate_customs':
         return {
           content: [{
             type: 'text',
             text: JSON.stringify(
-              await generateCustoms(args.products, args.destinationCountry, args.restrictionFlag),
+              await generateCustoms((args as any).products, (args as any).destinationCountry, (args as any).restrictionFlag),
               null,
               2
             )
@@ -65,7 +74,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{
             type: 'text',
             text: JSON.stringify(
-              convertAndBuffer(args.weightLbs, args.productDetails),
+              convertAndBuffer((args as any).weightLbs, (args as any).productDetails),
               null,
               2
             )
@@ -76,12 +85,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{
             type: 'text',
             text: JSON.stringify(
-              selectCarrierService({ recipient: { country: args.destinationCountry } }, args.serviceLevel),
+              selectCarrierService({ recipient: { country: (args as any).destinationCountry } }, (args as any).serviceLevel),
               null,
               2
             )
           }]
         };
+      case 'get_shipping_rates':
+        return await getShippingRates(args);
       default:
         throw new McpError(
           ErrorCode.MethodNotFound,

@@ -1,16 +1,29 @@
 {
   "mcpServers": {
-    "easypost-mcp-server": {
+    "easypost": {
       "command": "node",
-      "args": ["dist/src-index.js"],
-      "description": "Complete EasyPost shipping label automation with MCP integration",
-      "enabled": true,
-      "autoStart": true,
-      "env": {
-        "EASYPOST_API_KEY": "your_api_key_here",
-        "CONTEXT7_API_KEY": "ctx7sk-07231604-5282-4562-9f3c-50b13e28af5d"
-      }
+      "args": [
+        "dist/src-index.js"
+      ],
+      "description": "EasyPost MCP Server for automated shipping label creation",
+      "tools": [
+        "create_shipping_label",
+        "validate_address",
+        "calculate_customs",
+        "convert_weight",
+        "select_carrier"
+      ]
+    },
+    "context7": {
+      "command": "node",
+      "args": [
+        "/Users/andrejsp/Library/Application Support/Claude/Claude Extensions/context7/dist/index.js"
+      ],
+      "description": "Context7 Documentation Server - retrieve up-to-date documentation for any library",
+      "tools": [
+        "resolve-library-id",
+        "get-library-docs"
+      ]
     }
   }
 }
-
