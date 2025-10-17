@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
-import { createShippingLabel } from './src-tools-shipping-labels.js';
+import { createShippingLabel } from '../../src/tools/shipping-labels.js';
 
 // Mock environment variables
 beforeAll(() => {

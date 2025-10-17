@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { convertAndBuffer } from './src-tools-weight-converter.js';
-import { convertToOunces } from './src-utils-validation.js';
+import { convertAndBuffer } from '../../src/tools/weight-converter.js';
+import { convertToOunces } from '../../src/utils/validation.js';
 
 describe('Weight Converter', () => {
   describe('convertToOunces', () => {

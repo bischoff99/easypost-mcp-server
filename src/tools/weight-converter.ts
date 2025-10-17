@@ -1,4 +1,4 @@
-import { convertToOunces } from './src-utils-validation.js';
+import { convertToOunces } from '../utils/validation.js';
 
 export const weightConverterTool = {
   name: 'convert_weight',

@@ -3,7 +3,7 @@
     "easypost": {
       "command": "node",
       "args": [
-        "dist/src-index.js"
+        "dist/index.js"
       ],
       "description": "EasyPost MCP Server for automated shipping label creation",
       "tools": [

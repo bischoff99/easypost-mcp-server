@@ -1,5 +1,5 @@
 import { fetch } from 'undici';
-import { serverConfig } from './src-config.js';
+import { serverConfig } from '../config/index.js';
 
 export class Context7Client {
   private apiKey?: string;

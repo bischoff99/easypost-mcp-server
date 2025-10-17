@@ -11,7 +11,7 @@
     "allowJs": true,
     "noEmit": false,
     "outDir": "./dist",
-    "rootDir": ".",
+    "rootDir": "./src",
     "strict": true,
     "strictNullChecks": true,
     "noUnusedLocals": false,
@@ -28,10 +28,13 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src-*.ts"]
+      "@/tools/*": ["src/tools/*"],
+      "@/services/*": ["src/services/*"],
+      "@/types/*": ["src/types/*"],
+      "@/utils/*": ["src/utils/*"],
+      "@/config": ["src/config"]
     }
   },
-  "include": ["src-*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "tests"]
 }
-

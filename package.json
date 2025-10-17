@@ -6,12 +6,12 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/src-index.js",
-    "dev": "tsx watch src-index.ts",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
     "dev:tools": "tsx watch src-tools-shipping-labels.ts",
     "test": "vitest",
-    "test:unit": "vitest run tests-unit-*.test.ts",
-    "test:integration": "vitest run tests-integration-*.test.ts",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .ts,.js",
@@ -20,7 +20,13 @@
     "type-check": "tsc --noEmit",
     "quality:check": "pnpm run lint && pnpm run format && pnpm run type-check"
   },
-  "keywords": ["mcp", "easypost", "shipping", "automation", "customs"],
+  "keywords": [
+    "mcp",
+    "easypost",
+    "shipping",
+    "automation",
+    "customs"
+  ],
   "author": "Perplexity AI Labs",
   "license": "MIT",
   "dependencies": {
@@ -52,4 +58,3 @@
     "pnpm": ">=8.0.0"
   }
 }
-

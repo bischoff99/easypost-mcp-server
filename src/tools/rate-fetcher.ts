@@ -1,8 +1,8 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { EasyPostService } from './src-services-easypost-client.js';
-import { parseShippingInput, selectShipFromAddress } from './src-utils-validation.js';
-import { weightConverter } from './src-tools-weight-converter.js';
+import { EasyPostService } from '../services/easypost-client.js';
+import { parseShippingInput, selectShipFromAddress } from '../utils/validation.js';
+import { weightConverter } from './weight-converter.js';
 
 const getRatesSchema = z.object({
   inputData: z.string().describe('Shipping input data (CSV, JSON, or text description)'),

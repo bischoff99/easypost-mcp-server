@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import pino from 'pino';
-import { serverConfig } from './src-config.js';
+import { serverConfig } from '../config/index.js';
 
 const logger = pino({
   level: serverConfig.logging.level,

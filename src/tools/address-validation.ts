@@ -1,4 +1,4 @@
-import { Context7Client } from './src-services-context7-client.js';
+import { Context7Client } from '../services/context7-client.js';
 
 export const addressValidationTool = {
   name: 'validate_address',

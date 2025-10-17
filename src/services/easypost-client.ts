@@ -1,5 +1,5 @@
 import EasyPostClient from '@easypost/api';
-import { serverConfig } from './src-config.js';
+import { serverConfig } from '../config/index.js';
 
 export class EasyPostService {
   private client: any;

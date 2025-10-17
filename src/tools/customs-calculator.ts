@@ -1,5 +1,5 @@
-import { Context7Client } from './src-services-context7-client.js';
-import { convertToOunces, calculateEstimatedValue, generateSampleProducts, getCountryComplianceNotes } from './src-utils-validation.js';
+import { Context7Client } from '../services/context7-client.js';
+import { convertToOunces, calculateEstimatedValue, generateSampleProducts, getCountryComplianceNotes } from '../utils/validation.js';
 
 export const customsCalculatorTool = {
   name: 'calculate_customs',

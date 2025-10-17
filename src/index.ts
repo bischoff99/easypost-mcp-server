@@ -8,12 +8,12 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 // Import all tools
-import { shippingLabelTool, createShippingLabel } from './src-tools-shipping-labels.js';
-import { addressValidationTool, validateAddress } from './src-tools-address-validation.js';
-import { customsCalculatorTool, generateCustoms } from './src-tools-customs-calculator.js';
-import { weightConverterTool, convertAndBuffer } from './src-tools-weight-converter.js';
-import { carrierSelectorTool, selectCarrierService } from './src-tools-carrier-selector.js';
-import { rateFetcherTool, getShippingRates } from './src-tools-rate-fetcher.js';
+import { shippingLabelTool, createShippingLabel } from './tools/shipping-labels.js';
+import { addressValidationTool, validateAddress } from './tools/address-validation.js';
+import { customsCalculatorTool, generateCustoms } from './tools/customs-calculator.js';
+import { weightConverterTool, convertAndBuffer } from './tools/weight-converter.js';
+import { carrierSelectorTool, selectCarrierService } from './tools/carrier-selector.js';
+import { rateFetcherTool, getShippingRates } from './tools/rate-fetcher.js';
 
 const server = new Server(
   {

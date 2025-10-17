@@ -1,12 +1,12 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { EasyPostService } from './src-services-easypost-client.js';
-import { Context7Client } from './src-services-context7-client.js';
-import { weightConverter } from './src-tools-weight-converter.js';
-import { addressValidator } from './src-tools-address-validation.js';
-import { customsCalculator } from './src-tools-customs-calculator.js';
-import { parseShippingInput, selectShipFromAddress, selectCarrierService } from './src-utils-validation.js';
-import { serverConfig } from './src-config.js';
+import { EasyPostService } from '../services/easypost-client.js';
+import { Context7Client } from '../services/context7-client.js';
+import { weightConverter } from './weight-converter.js';
+import { addressValidator } from './address-validation.js';
+import { customsCalculator } from './customs-calculator.js';
+import { parseShippingInput, selectShipFromAddress, selectCarrierService } from '../utils/validation.js';
+import { serverConfig } from '../config/index.js';
 
 const createShippingLabelSchema = z.object({
   inputData: z.string().describe('Shipping input data (CSV, JSON, or text description)'),
