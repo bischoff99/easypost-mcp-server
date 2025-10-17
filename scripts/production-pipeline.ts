@@ -1,17 +1,17 @@
 #!/usr/bin/env tsx
 /**
  * Production-Grade Knowledge Pipeline
- * Industry Standards: LangChain + Cohere Rerank + Redis + OpenTelemetry
+ * Industry Standards: LangChain + HF Pro Reranking + Redis + OpenTelemetry
  */
 
 import { ChromaClient } from 'chromadb';
 import { DefaultEmbeddingFunction } from '@chroma-core/default-embed';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import Redis from 'ioredis';
-import { pipeline } from '@xenova/transformers';
+import { HfInference } from '@huggingface/inference';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+import { ConsoleSpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { createHash } from 'crypto';
 
 // Config
@@ -24,18 +24,20 @@ const CONFIG = {
   rerank: { topN: 5 }
 };
 
-// OpenTelemetry setup
-const sdk = new NodeSDK({
-  instrumentations: [getNodeAutoInstrumentations()],
+// OpenTelemetry setup (console-based, no external collector needed)
+const tracerProvider = new NodeTracerProvider({
+  spanProcessors: [new SimpleSpanProcessor(new ConsoleSpanExporter())]
 });
-sdk.start();
-const tracer = trace.getTracer('knowledge-pipeline');
+tracerProvider.register();
+const tracer = tracerProvider.getTracer('knowledge-pipeline');
+
+// HF Inference client
+const hf = new HfInference(process.env.HF_API_KEY);
 
 // Production Pipeline
 class ProductionPipeline {
   private chroma: ChromaClient;
   private redis: Redis;
-  private reranker: any;
   private splitter: RecursiveCharacterTextSplitter;
   private collection: any;
   
@@ -46,15 +48,6 @@ class ProductionPipeline {
       chunkSize: CONFIG.chunking.size,
       chunkOverlap: CONFIG.chunking.overlap
     });
-  }
-  
-  async loadReranker() {
-    if (!this.reranker) {
-      console.log('  📥 Loading reranker model (first time only)...');
-      this.reranker = await pipeline('text-classification', CONFIG.reranker.model);
-      console.log('  ✅ Reranker ready');
-    }
-    return this.reranker;
   }
   
   async initialize() {
@@ -144,7 +137,7 @@ class ProductionPipeline {
     }
   }
   
-  // Industry standard: Hybrid search + reranking
+  // Industry standard: Hybrid search + HF Pro reranking
   async query(question: string, filters?: any) {
     const span = tracer.startSpan('query');
     
@@ -161,32 +154,47 @@ class ProductionPipeline {
         return { documents: [], metadatas: [], scores: [] };
       }
       
-      // Step 2: Local Reranking (FREE - runs on your machine)
-      console.log('  🔄 Reranking with local model...');
-      const reranker = await this.loadReranker();
+      // Step 2: HF Pro Reranking (cloud-based, no local dependencies)
+      console.log('  🔄 Reranking with Hugging Face Pro...');
       
-      // Score each document with cross-encoder
-      const scores = await Promise.all(
-        vectorResults.documents[0].map(async (doc: string) => {
-          const result = await reranker(question, { text: doc });
-          return result[0].score;
-        })
-      );
-      
-      // Sort by reranker score
-      const ranked = scores
-        .map((score, index) => ({ score, index }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, CONFIG.rerank.topN);
-      
-      const results = {
-        documents: ranked.map(r => vectorResults.documents[0][r.index]),
-        metadatas: ranked.map(r => vectorResults.metadatas[0][r.index]),
-        scores: ranked.map(r => r.score)
-      };
-      
-      span.setStatus({ code: SpanStatusCode.OK });
-      return results;
+      try {
+        // Use HF sentence similarity API
+        const scores = await hf.sentenceSimilarity({
+          model: 'sentence-transformers/all-MiniLM-L6-v2',
+          inputs: {
+            source_sentence: question,
+            sentences: vectorResults.documents[0]
+          }
+        });
+        
+        // Sort by similarity scores (higher is better)
+        const ranked = scores
+          .map((score, index) => ({ score, index }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, CONFIG.rerank.topN);
+        
+        const results = {
+          documents: ranked.map(r => vectorResults.documents[0][r.index]),
+          metadatas: ranked.map(r => vectorResults.metadatas[0][r.index]),
+          scores: ranked.map(r => r.score)
+        };
+        
+        span.setStatus({ code: SpanStatusCode.OK });
+        return results;
+        
+      } catch (apiError: any) {
+        // Graceful fallback if HF API fails
+        console.warn(`  ⚠️  HF API error: ${apiError.message}`);
+        console.log('  📊 Falling back to vector search results');
+        
+        span.setStatus({ code: SpanStatusCode.ERROR, message: apiError.message });
+        
+        return {
+          documents: vectorResults.documents[0].slice(0, CONFIG.rerank.topN),
+          metadatas: vectorResults.metadatas[0].slice(0, CONFIG.rerank.topN),
+          scores: vectorResults.distances[0].slice(0, CONFIG.rerank.topN).map(d => 1 - d)
+        };
+      }
       
     } finally {
       span.end();
@@ -194,8 +202,11 @@ class ProductionPipeline {
   }
   
   async close() {
-    await this.redis.quit();
-    await sdk.shutdown();
+    try {
+      await this.redis.quit();
+    } catch (e) {
+      // Redis already closed
+    }
   }
 }
 
@@ -228,16 +239,17 @@ const arg = process.argv[3];
         break;
         
       default:
-        console.log('Production Pipeline (LangChain + FREE Local Reranker + Redis + OpenTelemetry)');
+        console.log('Production Pipeline (LangChain + HF Pro + Redis + OpenTelemetry)');
         console.log('\nUsage:');
         console.log('  tsx scripts/production-pipeline.ts ingest [url]');
         console.log('  tsx scripts/production-pipeline.ts query "question"');
         console.log('\nFeatures:');
-        console.log('  ✅ Chunking (500 tokens, 50 overlap) - LangChain');
-        console.log('  ✅ Redis cache (persistent embeddings) - 10x faster');
-        console.log('  ✅ FREE local rerank (ms-marco model) - No API key needed');
-        console.log('  ✅ OpenTelemetry (distributed tracing) - Performance monitoring');
-        console.log('\nCost: $0 - Everything runs locally!');
+        console.log('  ✅ LangChain chunking (500 tokens, 50 overlap)');
+        console.log('  ✅ Redis cache (persistent embeddings, 10x faster)');
+        console.log('  ✅ HF Pro reranking (sentence-transformers API)');
+        console.log('  ✅ OpenTelemetry tracing (console output)');
+        console.log('  ✅ Graceful fallbacks (API failures handled)');
+        console.log('\nRequires: HF_API_KEY in .env');
     }
     
     await pipeline.close();
