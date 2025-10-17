@@ -5,8 +5,8 @@
   "main": "dist/src-index.js",
   "type": "module",
   "scripts": {
-   "build": "tsup",
-   "start": "node dist/index.js",
+    "build": "tsup",
+    "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "dev:tools": "tsx watch src-tools-shipping-labels.ts",
     "test": "vitest",
@@ -25,6 +25,11 @@
     "knowledge:query": "tsx scripts/knowledge-pipeline.ts query",
     "knowledge:stats": "tsx scripts/knowledge-pipeline.ts stats",
     "chroma:start": "export CHROMA_SEGMENT_CACHE_POLICY=LRU && export CHROMA_MEMORY_LIMIT_BYTES=10000000000 && export PATH=\"/Users/andrejsp/Library/Python/3.9/bin:$PATH\" && chroma run --host localhost --port 8000",
+    "auto:ingest": "tsx scripts/automated-ingestion.ts once",
+    "auto:github": "tsx scripts/automated-ingestion.ts github",
+    "auto:stackoverflow": "tsx scripts/automated-ingestion.ts stackoverflow",
+    "auto:api-docs": "tsx scripts/automated-ingestion.ts api-docs",
+    "auto:schedule": "tsx scripts/automated-ingestion.ts schedule",
     "prepare": "husky"
   },
   "keywords": [
@@ -40,8 +45,10 @@
     "@chroma-core/default-embed": "^0.1.8",
     "@easypost/api": "^8.2.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "@types/node-cron": "^3.0.11",
     "chromadb": "^3.0.17",
     "dotenv": "^16.4.5",
+    "node-cron": "^4.2.1",
     "pino": "^9.5.0",
     "pino-pretty": "^11.3.0",
     "undici": "^7.2.0",

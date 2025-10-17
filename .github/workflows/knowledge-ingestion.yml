@@ -1,0 +1,86 @@
+name: Automated Knowledge Ingestion
+
+on:
+  schedule:
+    # Daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      ingestion_type:
+        description: 'Type of ingestion to run'
+        required: true
+        default: 'daily'
+        type: choice
+        options:
+          - daily
+          - weekly
+          - monthly
+          - github
+          - stackoverflow
+          - api-docs
+          - once
+
+jobs:
+  ingest-knowledge:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install
+      
+      - name: Start Chroma DB
+        run: |
+          docker run -d -p 8000:8000 \
+            -e CHROMA_SEGMENT_CACHE_POLICY=LRU \
+            -e CHROMA_MEMORY_LIMIT_BYTES=10000000000 \
+            --name chroma \
+            chromadb/chroma:latest
+          
+          # Wait for Chroma to be ready
+          timeout 30 bash -c 'until curl -f http://localhost:8000/api/v2; do sleep 1; done'
+          echo "✅ Chroma DB started"
+      
+      - name: Run automated ingestion
+        run: |
+          INGESTION_TYPE="${{ github.event.inputs.ingestion_type || 'daily' }}"
+          pnpm tsx scripts/automated-ingestion.ts $INGESTION_TYPE
+        env:
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          BROWSERBASE_API_KEY: ${{ secrets.BROWSERBASE_API_KEY }}
+          BROWSERBASE_PROJECT_ID: ${{ secrets.BROWSERBASE_PROJECT_ID }}
+          CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
+      
+      - name: Upload ingestion logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ingestion-logs-${{ github.run_number }}
+          path: logs/
+          retention-days: 30
+      
+      - name: Stop Chroma DB
+        if: always()
+        run: docker stop chroma && docker rm chroma
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Knowledge ingestion failed"
+          echo "Check logs for details"
+          # Add Slack/Discord notification here if desired
+
