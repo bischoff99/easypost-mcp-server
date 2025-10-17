@@ -159,11 +159,13 @@ class ProductionPipeline {
       
       try {
         // Use HF sentence similarity API
-        const scores = await hf.sentenceSimilarity(
-          question,
-          vectorResults.documents[0],
-          { model: 'sentence-transformers/all-MiniLM-L6-v2' }
-        );
+        const scores = await hf.sentenceSimilarity({
+          model: 'sentence-transformers/all-MiniLM-L6-v2',
+          inputs: {
+            source_sentence: question,
+            sentences: vectorResults.documents[0]
+          }
+        });
         
         // Sort by similarity scores (higher is better)
         const ranked = scores
