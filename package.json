@@ -30,8 +30,8 @@
     "auto:stackoverflow": "tsx scripts/automated-ingestion.ts stackoverflow",
     "auto:api-docs": "tsx scripts/automated-ingestion.ts api-docs",
     "auto:schedule": "tsx scripts/automated-ingestion.ts schedule",
-    "prod:ingest": "tsx scripts/production-pipeline.ts ingest",
-    "prod:query": "tsx scripts/production-pipeline.ts query",
+    "prod:ingest": "bash scripts/prod-wrapper.sh ingest",
+    "prod:query": "bash scripts/prod-wrapper.sh query",
     "redis:start": "brew services start redis",
     "prepare": "husky"
   },

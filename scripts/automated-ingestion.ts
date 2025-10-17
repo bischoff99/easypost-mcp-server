@@ -80,6 +80,20 @@ const AUTOMATED_SOURCES: Source[] = [
     priority: 1,
     updateFrequency: 'daily'
   },
+  {
+    type: 'url',
+    data: 'https://raw.githubusercontent.com/EasyPost/easypost-node/master/CONTRIBUTING.md',
+    category: 'github-contributing',
+    priority: 2,
+    updateFrequency: 'weekly'
+  },
+  {
+    type: 'url',
+    data: 'https://raw.githubusercontent.com/EasyPost/easypost-node/master/UPGRADING.md',
+    category: 'github-upgrade-guide',
+    priority: 1,
+    updateFrequency: 'monthly'
+  },
   
   // === STACK OVERFLOW (Priority 2 - Daily) ===
   {

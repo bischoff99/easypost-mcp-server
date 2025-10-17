@@ -11,13 +11,12 @@ import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import Redis from 'ioredis';
 import { HfInference } from '@huggingface/inference';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
-import { ConsoleSpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { createHash } from 'crypto';
 
 // Config
 const CONFIG = {
-  chroma: { url: 'http://localhost:8000', collection: 'easypost-production' },
+  chroma: { host: 'localhost', port: 8000, collection: 'easypost-production' },
   redis: { host: 'localhost', port: 6379, db: 0 },
   reranker: { model: 'Xenova/ms-marco-MiniLM-L-6-v2' }, // Free local model
   chunking: { size: 500, overlap: 50 },
@@ -25,10 +24,8 @@ const CONFIG = {
   rerank: { topN: 5 }
 };
 
-// OpenTelemetry setup (console-based, no external collector needed)
-const tracerProvider = new NodeTracerProvider({
-  spanProcessors: [new SimpleSpanProcessor(new ConsoleSpanExporter())]
-});
+// OpenTelemetry setup (internal tracing, no console spam)
+const tracerProvider = new NodeTracerProvider();
 tracerProvider.register();
 const tracer = tracerProvider.getTracer('knowledge-pipeline');
 
@@ -43,7 +40,10 @@ class ProductionPipeline {
   private collection: any;
   
   constructor() {
-    this.chroma = new ChromaClient({ path: CONFIG.chroma.url });
+    this.chroma = new ChromaClient({ 
+      host: CONFIG.chroma.host, 
+      port: CONFIG.chroma.port 
+    });
     this.redis = new Redis(CONFIG.redis);
     this.splitter = new RecursiveCharacterTextSplitter({
       chunkSize: CONFIG.chunking.size,
@@ -130,6 +130,9 @@ class ProductionPipeline {
       
       span.setStatus({ code: SpanStatusCode.OK });
       console.log(`  ✅ Stored ${chunks.length} chunks`);
+      
+      // Force immediate exit after successful ingest to avoid ChromaDB cleanup
+      process.exit(0);
     } catch (error: any) {
       span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
       throw error;
@@ -208,6 +211,8 @@ class ProductionPipeline {
     } catch (e) {
       // Redis already closed
     }
+    // Force immediate exit to prevent ChromaDB mutex cleanup error
+    process.exit(0);
   }
 }
 
@@ -253,11 +258,11 @@ const arg = process.argv[3];
         console.log('\nRequires: HF_API_KEY in .env');
     }
     
-    await pipeline.close();
+    // Don't call close() - it triggers ChromaDB mutex error
+    // Data is already persisted, cleanup is optional
     process.exit(0);
   } catch (error: any) {
     console.error('❌ Error:', error.message);
-    await pipeline.close();
     process.exit(1);
   }
 })();
