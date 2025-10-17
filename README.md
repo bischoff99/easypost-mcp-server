@@ -42,36 +42,40 @@ CONTEXT7_API_KEY=your_context7_key_here
 
 ## Usage
 
-### Development Mode
+### EasyPost MCP Server
 
 ```bash
-npm run dev
+pnpm run build  # Build with tsup (fast)
+pnpm start      # Start MCP server
+pnpm dev        # Development mode
 ```
 
-### Production Build
+### Knowledge Pipeline (NEW!)
 
 ```bash
-npm run build
-npm start
+# Start services
+pnpm chroma:start  # Chroma DB
+pnpm redis:start   # Redis cache (already running)
+
+# Basic pipeline
+pnpm knowledge:query "your question"
+
+# Production pipeline (LangChain + Redis + FREE Reranker)
+pnpm prod:ingest [url]
+pnpm prod:query "question"
+
+# Automated multi-source ingestion
+pnpm auto:github          # GitHub docs
+pnpm auto:stackoverflow   # Stack Overflow
+pnpm auto:api-docs        # API documentation
 ```
 
 ### Testing
 
 ```bash
-# Run all tests
-npm test
-
-# Run unit tests only
-npm run test:unit
-
-# Run integration tests
-npm run test:integration
-
-# Watch mode
-npm run test:watch
-
-# Coverage report
-npm run test:coverage
+pnpm test              # Run all tests
+pnpm test:unit         # Unit tests only
+pnpm test:integration  # Integration tests
 ```
 
 ## MCP Tools
